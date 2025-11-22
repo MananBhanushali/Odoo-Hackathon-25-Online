@@ -9,13 +9,37 @@ const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const handleSignIn = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Simulate admin auth check
-    setTimeout(() => {
-        showToast('Admin Security Clearance Granted', 'success');
-        navigate('/admin-dashboard');
-    }, 800);
+    const formData = new FormData(e.currentTarget);
+    const loginId = formData.get('loginId') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Check if user has admin role
+        if (data.user.role === 'Super Admin' || data.user.role === 'Admin') {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            showToast('Admin Security Clearance Granted', 'success');
+            navigate('/admin-dashboard');
+        } else {
+            showToast('Access Denied: Insufficient Privileges', 'error');
+        }
+      } else {
+        showToast(data.error || 'Authentication Failed', 'error');
+      }
+    } catch (error) {
+      showToast('System Error: Authentication Service Unavailable', 'error');
+    }
   };
 
   const testimonials: Testimonial[] = [

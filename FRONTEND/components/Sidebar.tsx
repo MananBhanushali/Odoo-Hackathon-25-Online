@@ -22,6 +22,15 @@ const AppSidebar: React.FC<SidebarProps> = ({ isMobileOpen, toggleMobile }) => {
     }
   }, [isMobileOpen]);
 
+  const [user, setUser] = useState<{ name: string; role: string; avatar?: string } | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
   const handleSetOpen = (val: boolean | ((prev: boolean) => boolean)) => {
     const newState = typeof val === 'function' ? val(open) : val;
     setOpen(newState);
@@ -134,12 +143,18 @@ const AppSidebar: React.FC<SidebarProps> = ({ isMobileOpen, toggleMobile }) => {
         
         <div className="mt-auto flex flex-col gap-4">
           <div className={`flex items-center ${open ? 'gap-3 px-2' : 'justify-center'}`}>
-                <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 p-[2px] flex-shrink-0 overflow-hidden cursor-pointer hover:scale-105 transition-transform ring-2 ring-transparent hover:ring-blue-500/50">
-                    <img
-                        src="https://randomuser.me/api/portraits/men/32.jpg"
-                        className="h-full w-full object-cover rounded-full"
-                        alt="Avatar"
-                    />
+                <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 p-[2px] flex-shrink-0 overflow-hidden cursor-pointer hover:scale-105 transition-transform ring-2 ring-transparent hover:ring-blue-500/50 flex items-center justify-center">
+                    {user?.avatar ? (
+                        <img
+                            src={user.avatar}
+                            className="h-full w-full object-cover rounded-full"
+                            alt="Avatar"
+                        />
+                    ) : (
+                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                            {user?.name?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                    )}
                 </div>
                 {open && (
                     <motion.div 
@@ -147,8 +162,8 @@ const AppSidebar: React.FC<SidebarProps> = ({ isMobileOpen, toggleMobile }) => {
                         animate={{ opacity: 1 }}
                         className="flex flex-col overflow-hidden"
                     >
-                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">Manan B.</span>
-                        <span className="text-[10px] text-slate-500 dark:text-gray-400 truncate">Warehouse Mgr.</span>
+                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{user?.name || 'Guest'}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-gray-400 truncate">{user?.role || 'Visitor'}</span>
                     </motion.div>
                 )}
           </div>

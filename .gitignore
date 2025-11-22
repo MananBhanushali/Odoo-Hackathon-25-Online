@@ -1,23 +1,30 @@
 # Logs
-FRONTEND/logs
+frontend/logs
 *.log
-FRONTEND/npm-debug.log*
-FRONTEND/yarn-debug.log*
-FRONTEND/yarn-error.log*
-FRONTEND/pnpm-debug.log*
-FRONTEND/lerna-debug.log*
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
 
-FRONTEND/package-lock.json
+frontend/package-lock.json
 
 # Dependencies
-FRONTEND/node_modules
+frontend/node_modules
 
 # Build Output
-FRONTEND/dist
-FRONTEND/dist-ssr
+frontend/dist
+frontend/dist-ssr
 
 # Environment / Local Config
-FRONTEND/*.local
+frontend/*.local
+
+# Backend
+backend/node_modules
+backend/package-lock.json
+backend/node_modules
+backend/.env
+backend/generated/prisma
 
 # Editor directories and files (Keep global)
 .vscode/*

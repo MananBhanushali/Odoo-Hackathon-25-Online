@@ -1,0 +1,36 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  loginId   String   @unique
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("User")
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  permissions Permissions?
+}
+
+model Permissions {
+  id          String  @id @default(uuid())
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  dashboard   Boolean @default(false)
+  inventory   Boolean @default(false)
+  operations  Boolean @default(false)
+  audit_log   Boolean @default(false)
+  settings    Boolean @default(false)
+  user_mgmt   Boolean @default(false)
+}

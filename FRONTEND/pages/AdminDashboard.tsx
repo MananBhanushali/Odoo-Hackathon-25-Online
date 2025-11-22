@@ -10,6 +10,7 @@ interface AdminUser {
   id: string;
   name: string;
   email: string;
+  loginId: string;
   role: string;
   avatar: string;
   permissions: {
@@ -25,39 +26,47 @@ interface AdminUser {
 
 const MOCK_USERS: AdminUser[] = [
   {
-    id: '1', name: 'Manan Bhanushali', email: 'manan@stockmaster.com', role: 'Super Admin', avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+    id: '1', name: 'Manan Bhanushali', email: 'manan@stockmaster.com', loginId: 'manan', role: 'Super Admin', avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
     permissions: { dashboard: true, inventory: true, operations: true, audit_log: true, settings: true, user_mgmt: true }
   },
-  {
-    id: '2', name: 'Sarah Connor', email: 'sarah.c@stockmaster.com', role: 'Warehouse Mgr', avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-    permissions: { dashboard: true, inventory: true, operations: true, audit_log: true, settings: false, user_mgmt: false }
-  },
-  {
-    id: '3', name: 'John Smith', email: 'john.s@stockmaster.com', role: 'Stock Clerk', avatar: 'https://randomuser.me/api/portraits/men/86.jpg',
-    permissions: { dashboard: false, inventory: true, operations: true, audit_log: false, settings: false, user_mgmt: false }
-  },
-  {
-    id: '4', name: 'Emily Blunt', email: 'emily.b@stockmaster.com', role: 'Auditor', avatar: 'https://randomuser.me/api/portraits/women/68.jpg',
-    permissions: { dashboard: true, inventory: true, operations: false, audit_log: true, settings: false, user_mgmt: false }
-  },
-  {
-    id: '5', name: 'Michael Scott', email: 'michael.s@stockmaster.com', role: 'Regional Mgr', avatar: 'https://randomuser.me/api/portraits/men/12.jpg',
-    permissions: { dashboard: true, inventory: false, operations: false, audit_log: true, settings: false, user_mgmt: false }
-  },
-  {
-    id: '6', name: 'David Kim', email: 'david.k@stockmaster.com', role: 'Logistics', avatar: 'https://randomuser.me/api/portraits/men/22.jpg',
-    permissions: { dashboard: true, inventory: true, operations: true, audit_log: false, settings: false, user_mgmt: false }
-  },
-  {
-    id: '7', name: 'Jessica Jones', email: 'jessica.j@stockmaster.com', role: 'Intern', avatar: 'https://randomuser.me/api/portraits/women/24.jpg',
-    permissions: { dashboard: false, inventory: false, operations: true, audit_log: false, settings: false, user_mgmt: false }
-  },
+  // ... other mocks if needed, but we fetch from API mostly
 ];
 
 const AdminDashboard: React.FC = () => {
-  const [users, setUsers] = useState<AdminUser[]>(MOCK_USERS);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
   const { showToast } = useToast();
+  const token = localStorage.getItem('token');
+
+  React.useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/users', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Map backend data to frontend interface if necessary
+        // Backend returns permissions object which matches frontend
+        // Backend returns avatar (nullable), frontend expects string. Handle that.
+        const mappedUsers = data.map((u: any) => ({
+          ...u,
+          avatar: u.avatar || `https://ui-avatars.com/api/?name=${u.name}&background=random`,
+          permissions: u.permissions || {
+            dashboard: false, inventory: false, operations: false, audit_log: false, settings: false, user_mgmt: false
+          }
+        }));
+        setUsers(mappedUsers);
+      } else {
+        showToast('Failed to fetch users', 'error');
+      }
+    } catch (error) {
+      showToast('Error fetching users', 'error');
+    }
+  };
 
   const permissionColumns = [
     { key: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
@@ -81,9 +90,90 @@ const AdminDashboard: React.FC = () => {
     }));
   };
 
-  const handleSave = (userId: string) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, isDirty: false } : u));
-    showToast('User permissions updated successfully', 'success');
+  const handleSave = async (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    try {
+      const response = await fetch(`http://localhost:3000/api/users/${userId}/permissions`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify(user.permissions),
+      });
+
+      if (response.ok) {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, isDirty: false } : u));
+        showToast('User permissions updated successfully', 'success');
+      } else {
+        showToast('Failed to update permissions', 'error');
+      }
+    } catch (error) {
+      showToast('Error updating permissions', 'error');
+    }
+  };
+
+  const handleRemoveUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+
+    try {
+        const response = await fetch(`http://localhost:3000/api/users/${userId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.ok) {
+            setUsers(prev => prev.filter(u => u.id !== userId));
+            showToast('User deleted successfully', 'success');
+        } else {
+            showToast('Failed to delete user', 'error');
+        }
+    } catch (error) {
+        showToast('Error deleting user', 'error');
+    }
+  };
+
+  const handleAddUser = async () => {
+      // Simple prompt-based creation for now
+      const name = prompt("Enter Name:");
+      if (!name) return;
+      const loginId = prompt("Enter Login ID:");
+      if (!loginId) return;
+      const email = prompt("Enter Email:");
+      if (!email) return;
+      const password = prompt("Enter Password:");
+      if (!password) return;
+      const role = prompt("Enter Role (Admin/User):", "User");
+
+      try {
+          const response = await fetch('http://localhost:3000/api/users', {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}` 
+              },
+              body: JSON.stringify({ name, loginId, email, password, role }),
+          });
+
+          if (response.ok) {
+              const newUser = await response.json();
+              setUsers(prev => [{
+                  ...newUser,
+                  avatar: newUser.avatar || `https://ui-avatars.com/api/?name=${newUser.name}&background=random`,
+                  permissions: newUser.permissions || {
+                    dashboard: true, inventory: true, operations: true, audit_log: false, settings: false, user_mgmt: false
+                  }
+              }, ...prev]);
+              showToast('User created successfully', 'success');
+          } else {
+              const errorData = await response.json();
+              showToast(errorData.error || 'Failed to create user', 'error');
+          }
+      } catch (error) {
+          showToast('Error creating user', 'error');
+      }
   };
 
   const filteredUsers = users.filter(u => 
@@ -116,12 +206,8 @@ const AdminDashboard: React.FC = () => {
                     onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-            <button className="px-4 py-2 bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 text-slate-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 border border-slate-200 dark:border-white/10 rounded-xl transition-colors flex items-center gap-2 font-medium text-sm">
-                <Trash2 size={16} />
-                Remove
-            </button>
             <ShimmerButton
-                 onClick={() => showToast('Create user wizard opening...', 'info')}
+                 onClick={handleAddUser}
                  background="linear-gradient(90deg, #2563EB, #0284c7)"
                  shimmerColor="rgba(255,255,255,0.4)"
                  className="shadow-lg shadow-blue-500/20 !rounded-xl !py-2 !h-10"
@@ -174,6 +260,7 @@ const AdminDashboard: React.FC = () => {
                                         <div className="text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap">{user.name}</div>
                                         <div className="text-xs text-slate-500 dark:text-gray-400 flex flex-col">
                                             <span>{user.email}</span>
+                                            <span className="text-slate-400">@{user.loginId}</span>
                                             <span className="text-[10px] uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400 mt-0.5">{user.role}</span>
                                         </div>
                                     </div>
@@ -213,18 +300,27 @@ const AdminDashboard: React.FC = () => {
 
                             {/* Action Column */}
                             <td className="p-4 sticky right-0 bg-white dark:bg-[#0F172A] group-hover:bg-slate-50 dark:group-hover:bg-[#1e293b] z-10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)] transition-colors">
-                                <button
-                                    onClick={() => handleSave(user.id)}
-                                    disabled={!user.isDirty}
-                                    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all w-full ${
-                                        user.isDirty 
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 hover:bg-blue-500 active:scale-95' 
-                                        : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-gray-600 cursor-default'
-                                    }`}
-                                >
-                                    <Save size={14} />
-                                    {user.isDirty ? 'Save' : 'Synced'}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleSave(user.id)}
+                                        disabled={!user.isDirty}
+                                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all flex-1 ${
+                                            user.isDirty 
+                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 hover:bg-blue-500 active:scale-95' 
+                                            : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-gray-600 cursor-default'
+                                        }`}
+                                    >
+                                        <Save size={14} />
+                                        {user.isDirty ? 'Save' : 'Synced'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleRemoveUser(user.id)}
+                                        className="p-2 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+                                        title="Delete User"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </td>
                         </motion.tr>
                     ))}

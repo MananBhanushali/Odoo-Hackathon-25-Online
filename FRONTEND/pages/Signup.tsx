@@ -9,13 +9,40 @@ const Signup: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const handleSignUp = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Simulate API call
-    setTimeout(() => {
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get('name') as string;
+    const loginId = formData.get('loginId') as string;
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const confirmPassword = formData.get('confirmPassword') as string;
+
+    if (password !== confirmPassword) {
+      showToast('Passwords do not match', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, loginId, email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
         showToast('Account created successfully! Welcome aboard.', 'success');
         navigate('/dashboard');
-    }, 800);
+      } else {
+        showToast(data.error || 'Signup failed', 'error');
+      }
+    } catch (error) {
+      showToast('An error occurred during signup', 'error');
+    }
   };
 
   const handleGoogleSignUp = () => {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -51,11 +51,18 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   });
   const location = useLocation();
 
+  const [user, setUser] = useState<{ name: string; role: string; avatar?: string } | null>(null);
+
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
     localStorage.setItem('theme', theme);
+    
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
   }, [theme]);
 
   const toggleTheme = () => {
@@ -107,12 +114,18 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </button>
             <div className="hidden md:flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-white/10">
             <div className="text-right">
-                <p className="text-sm font-medium text-slate-900 dark:text-white">Manan Bhanushali</p>
-                <p className="text-xs text-slate-500 dark:text-gray-500">Admin</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-white">{user?.name || 'Guest'}</p>
+                <p className="text-xs text-slate-500 dark:text-gray-500">{user?.role || 'Visitor'}</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 p-[2px]">
                 <div className="w-full h-full rounded-full bg-white dark:bg-[#0f0e17] flex items-center justify-center overflow-hidden">
-                    <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="User" className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity" />
+                    {user?.avatar ? (
+                        <img src={user.avatar} alt="User" className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity" />
+                    ) : (
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                            {user?.name?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                    )}
                 </div>
             </div>
             </div>

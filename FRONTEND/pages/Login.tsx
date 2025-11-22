@@ -7,13 +7,32 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const handleSignIn = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Simulate login delay
-    setTimeout(() => {
-        showToast('Welcome back, Manan!', 'success');
+    const formData = new FormData(e.currentTarget);
+    const loginId = formData.get('loginId') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        showToast(`Welcome back, ${data.user.name}!`, 'success');
         navigate('/dashboard');
-    }, 600);
+      } else {
+        showToast(data.error || 'Login failed', 'error');
+      }
+    } catch (error) {
+      showToast('An error occurred during login', 'error');
+    }
   };
 
   const handleGoogleSignIn = () => {
