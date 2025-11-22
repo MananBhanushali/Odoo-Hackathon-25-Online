@@ -40,6 +40,28 @@ const PageTransition: React.FC<{ children: React.ReactNode }> = ({ children }) =
   </motion.div>
 );
 
+const ProtectedRoute: React.FC<{ children: React.ReactNode; permission?: string }> = ({ children, permission }) => {
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (permission && (!user.permissions || !user.permissions[permission])) {
+     return (
+        <div className="flex flex-col items-center justify-center h-full text-slate-500 dark:text-slate-400">
+            <div className="bg-slate-100 dark:bg-white/5 p-6 rounded-2xl flex flex-col items-center">
+                <h2 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">Access Denied</h2>
+                <p>You do not have permission to view this page.</p>
+            </div>
+        </div>
+     );
+  }
+
+  return <>{children}</>;
+};
+
 // Layout for the Main App
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -147,12 +169,12 @@ const AnimatedRoutes: React.FC = () => {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/dashboard" element={<PageTransition><Dashboard /></PageTransition>} />
-        <Route path="/products" element={<PageTransition><Products /></PageTransition>} />
-        <Route path="/operations" element={<PageTransition><Operations /></PageTransition>} />
-        <Route path="/history" element={<PageTransition><MoveHistory /></PageTransition>} />
-        <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
-        <Route path="/admin-dashboard" element={<PageTransition><AdminDashboard /></PageTransition>} />
+        <Route path="/dashboard" element={<ProtectedRoute permission="dashboard"><PageTransition><Dashboard /></PageTransition></ProtectedRoute>} />
+        <Route path="/products" element={<ProtectedRoute permission="inventory"><PageTransition><Products /></PageTransition></ProtectedRoute>} />
+        <Route path="/operations" element={<ProtectedRoute permission="operations"><PageTransition><Operations /></PageTransition></ProtectedRoute>} />
+        <Route path="/history" element={<ProtectedRoute permission="audit_log"><PageTransition><MoveHistory /></PageTransition></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute permission="settings"><PageTransition><Settings /></PageTransition></ProtectedRoute>} />
+        <Route path="/admin-dashboard" element={<ProtectedRoute permission="user_mgmt"><PageTransition><AdminDashboard /></PageTransition></ProtectedRoute>} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

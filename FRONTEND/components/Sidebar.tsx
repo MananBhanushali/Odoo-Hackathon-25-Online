@@ -22,7 +22,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ isMobileOpen, toggleMobile }) => {
     }
   }, [isMobileOpen]);
 
-  const [user, setUser] = useState<{ name: string; role: string; avatar?: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; role: string; avatar?: string; permissions?: any } | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -40,33 +40,43 @@ const AppSidebar: React.FC<SidebarProps> = ({ isMobileOpen, toggleMobile }) => {
     }
   };
 
-  const links = [
+  const allLinks = [
     { 
         label: 'Dashboard', 
         href: '/dashboard', 
-        icon: <LayoutGrid className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} /> 
+        icon: <LayoutGrid className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} />,
+        permission: 'dashboard'
     },
     { 
         label: 'Inventory', 
         href: '/products', 
-        icon: <Box className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} /> 
+        icon: <Box className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} />,
+        permission: 'inventory'
     },
     { 
         label: 'Operations', 
         href: '/operations', 
-        icon: <ArrowRightLeft className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} /> 
+        icon: <ArrowRightLeft className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} />,
+        permission: 'operations'
     },
     { 
         label: 'Audit Log', 
         href: '/history', 
-        icon: <History className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} /> 
+        icon: <History className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} />,
+        permission: 'audit_log'
     },
     { 
         label: 'Configuration', 
         href: '/settings', 
-        icon: <Settings className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} /> 
+        icon: <Settings className="h-[22px] w-[22px] flex-shrink-0" strokeWidth={1.5} />,
+        permission: 'settings'
     },
   ];
+
+  const links = allLinks.filter(link => {
+    if (!user || !user.permissions) return true; // Default to show if no permissions found (or handle as hidden)
+    return user.permissions[link.permission];
+  });
 
   const handleLogout = () => {
     navigate('/login');
