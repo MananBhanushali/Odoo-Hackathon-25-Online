@@ -27,6 +27,7 @@ interface DataContextType {
   addLocation: (l: Partial<Location>) => Promise<void>;
   deleteLocation: (id: string) => Promise<void>;
   resetData: () => void;
+  refreshOperations: () => Promise<void>;
   simulateScenario: (type: 'crash' | 'viral' | 'hack') => void;
 }
 
@@ -221,6 +222,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log("Reset data not fully implemented for backend mode");
   };
 
+  const refreshOperations = useCallback(async () => {
+    try {
+      const refreshedOperations = await operationService.list();
+      setOperations(refreshedOperations);
+    } catch (error) {
+      showToast('Failed to refresh operations', 'error');
+    }
+  }, [showToast]);
+
   // The Core Logic: Processing an operation (Client-side simulation for now)
   const validateOperation = useCallback(async (op: Operation) => {
     if (op.status === 'Done') return;
@@ -228,9 +238,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updated = await operationService.updateStatus(op.id, 'DONE');
       setOperations(prev => prev.map(o => o.id === op.id ? updated : o));
       // Refresh products and moves after backend applied changes
-      const [freshProducts, freshMoves] = await Promise.all([
+      const [freshProducts, freshMoves, refreshedOperations] = await Promise.all([
         productService.getAll(),
-        moveService.list()
+        moveService.list(),
+        operationService.list() // Refresh operations to get updated statuses
       ]);
       const processedProducts = freshProducts.map(p => ({
         ...p,
@@ -238,6 +249,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
       setProducts(processedProducts);
       setMoves(freshMoves);
+      setOperations(refreshedOperations); // Update operations with refreshed statuses
     } catch (e) {
       showToast('Failed to validate operation', 'error');
     }
@@ -256,7 +268,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addOperation, updateOperation, validateOperation,
       addWarehouse, updateWarehouse, deleteWarehouse,
       addLocation, deleteLocation,
-      resetData, simulateScenario
+      resetData, refreshOperations, simulateScenario
     }}>
       {children}
     </DataContext.Provider>

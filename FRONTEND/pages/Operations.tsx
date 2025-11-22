@@ -1,21 +1,23 @@
 
 import React, { useState } from 'react';
 import { Operation, OperationStatus } from '../types';
-import { List, Kanban, Printer, X, ChevronRight, Clock, CheckCircle2, AlertOctagon, Loader2 } from 'lucide-react';
+import { List, Kanban, Printer, X, ChevronRight, Clock, CheckCircle2, AlertOctagon, Loader2, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Card from '../components/ui/Card';
 import { ShimmerButton } from '../components/ui/ShimmerButton';
 import { useToast } from '../context/ToastContext';
 import { useData } from '../context/DataContext';
+import { operationService } from '../services/operationService';
 
 const Operations: React.FC = () => {
-    const { operations, products, addOperation, updateOperation, validateOperation, warehouses, locations } = useData();
+    const { operations, products, addOperation, updateOperation, validateOperation, warehouses, locations, refreshOperations } = useData();
   const { showToast } = useToast();
     const [view, setView] = useState<'kanban' | 'list'>('list');
   const [selectedOp, setSelectedOp] = useState<Operation | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeType, setActiveType] = useState<'All' | 'Receipt' | 'Delivery' | 'Internal' | 'Adjustment'>('All');
   const [isValidating, setIsValidating] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const statuses: OperationStatus[] = ['Draft', 'Waiting', 'Ready', 'Done'];
   const filteredOps = operations.filter(op => activeType === 'All' || op.type === activeType);
@@ -63,6 +65,19 @@ const Operations: React.FC = () => {
     }, 800);
   };
 
+  const handleRefreshStatuses = async () => {
+    setIsRefreshing(true);
+    try {
+      await operationService.refreshStatuses();
+      await refreshOperations(); // Refresh the operations in context
+      showToast('Delivery statuses refreshed', 'success');
+    } catch (error) {
+      showToast('Failed to refresh statuses', 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
 
 
 
@@ -90,10 +105,21 @@ const Operations: React.FC = () => {
                 <Kanban size={20} />
             </button>
           </div>
-                    <div className="hidden md:flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400">
-                        <span>Use dedicated pages:</span>
-                        <a href="/operations/receipt/new" className="px-2 py-1 rounded bg-green-600/10 text-green-600 dark:text-green-400 font-mono border border-green-600/20 hover:bg-green-600/20">Receipt</a>
-                        <a href="/operations/delivery/new" className="px-2 py-1 rounded bg-blue-600/10 text-blue-600 dark:text-blue-400 font-mono border border-blue-600/20 hover:bg-blue-600/20">Delivery</a>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleRefreshStatuses}
+                            disabled={isRefreshing}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+                            title="Refresh delivery statuses"
+                        >
+                            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                        </button>
+                        <div className="hidden md:flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400">
+                            <span>Use dedicated pages:</span>
+                            <a href="/operations/receipt/new" className="px-2 py-1 rounded bg-green-600/10 text-green-600 dark:text-green-400 font-mono border border-green-600/20 hover:bg-green-600/20">Receipt</a>
+                            <a href="/operations/delivery/new" className="px-2 py-1 rounded bg-blue-600/10 text-blue-600 dark:text-blue-400 font-mono border border-blue-600/20 hover:bg-blue-600/20">Delivery</a>
+                        </div>
                     </div>
         </div>
       </div>

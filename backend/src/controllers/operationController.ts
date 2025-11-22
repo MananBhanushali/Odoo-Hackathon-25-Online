@@ -128,6 +128,33 @@ export const getOperation = async (req: Request, res: Response) => {
   }
 };
 
+// Helper function to check and update waiting deliveries to ready when stock is available
+async function updateWaitingDeliveries() {
+  const waitingDeliveries = await db.operation.findMany({
+    where: { type: 'DELIVERY', status: 'WAITING' },
+    include: { items: true }
+  });
+
+  for (const delivery of waitingDeliveries) {
+    if (delivery.items.length === 0) continue;
+    
+    const productIds = delivery.items.map(item => item.productId);
+    const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
+    
+    const hasInsufficientStock = delivery.items.some(item => {
+      const product = products.find(p => p.id === item.productId);
+      return product && product.quantity < item.quantity;
+    });
+    
+    if (!hasInsufficientStock) {
+      await db.operation.update({
+        where: { id: delivery.id },
+        data: { status: 'READY' }
+      });
+    }
+  }
+}
+
 export const updateOperationStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -181,6 +208,12 @@ export const updateOperationStatus = async (req: Request, res: Response) => {
 
         return (tx as any).operation.update({ where: { id: full.id }, data: { status: 'DONE' } });
       });
+      
+      // After completing a receipt, check if any waiting deliveries can now be fulfilled
+      if (op.type === 'RECEIPT') {
+        await updateWaitingDeliveries();
+      }
+      
       const final = await db.operation.findUnique({ where: { id: updated.id }, include: { items: true, fromLocation: true, toLocation: true } });
       return res.json(formatOperation(final!));
     } else {
@@ -306,6 +339,17 @@ export const updateOperationDraft = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ message: 'Failed to update operation' });
+  }
+};
+
+// Endpoint to manually refresh delivery statuses
+export const refreshDeliveryStatuses = async (_req: Request, res: Response) => {
+  try {
+    await updateWaitingDeliveries();
+    return res.json({ message: 'Delivery statuses refreshed successfully' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Failed to refresh delivery statuses' });
   }
 };
 

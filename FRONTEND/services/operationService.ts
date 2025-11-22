@@ -35,4 +35,7 @@ export const operationService = {
   updateStatus: async (id: string, status: string): Promise<Operation> => {
     return api.patch(`/operations/${id}/status`, { status: status.toUpperCase() });
   },
+  refreshStatuses: async (): Promise<{ message: string }> => {
+    return api.post('/operations/refresh-statuses', {});
+  },
 };
