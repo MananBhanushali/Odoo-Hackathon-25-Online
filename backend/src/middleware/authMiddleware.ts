@@ -31,3 +31,6 @@ export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction
   }
   next();
 };
+
+// Alias expected by route files
+export const protect = authenticate;

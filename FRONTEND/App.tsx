@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -175,7 +174,7 @@ const AnimatedRoutes: React.FC = () => {
         <Route path="/history" element={<ProtectedRoute permission="audit_log"><PageTransition><MoveHistory /></PageTransition></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute permission="settings"><PageTransition><Settings /></PageTransition></ProtectedRoute>} />
         <Route path="/admin-dashboard" element={<ProtectedRoute permission="user_mgmt"><PageTransition><AdminDashboard /></PageTransition></ProtectedRoute>} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to="/products" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AnimatePresence>

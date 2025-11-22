@@ -38,7 +38,8 @@ const Dashboard: React.FC = () => {
   // Generate category pie data from real products
   const categoryCounts: Record<string, number> = {};
   products.forEach(p => {
-    categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1;
+    const cat = p.category || 'Uncategorized';
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
   });
   
   const pieData = Object.keys(categoryCounts).map(cat => ({

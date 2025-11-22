@@ -34,3 +34,42 @@ model Permissions {
   settings    Boolean @default(false)
   user_mgmt   Boolean @default(false)
 }
+
+model Warehouse {
+  id        String     @id @default(uuid())
+  name      String
+  shortCode String     @unique
+  address   String?
+  locations Location[]
+  
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Location {
+  id          String    @id @default(uuid())
+  name        String
+  shortCode   String    @unique
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  products    Product[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id           String    @id @default(uuid())
+  name         String
+  sku          String    @unique
+  quantity     Int       @default(0)
+  category     String?
+  minThreshold Int       @default(0)
+  price        Float     @default(0.0)
+  
+  locationId   String?
+  location     Location? @relation(fields: [locationId], references: [id])
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

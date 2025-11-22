@@ -3,12 +3,13 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
-  category: string;
-  stock: number;
-  minStock: number;
+  category: string | null;
+  quantity: number;
+  minThreshold: number;
   price: number;
-  location: string;
-  status: 'In Stock' | 'Low Stock' | 'Out of Stock';
+  locationId: string | null;
+  location?: Location; // For joined data
+  status?: 'In Stock' | 'Low Stock' | 'Out of Stock'; // Computed on frontend
 }
 
 export type OperationType = 'Receipt' | 'Delivery' | 'Internal' | 'Adjustment';

@@ -464,7 +464,7 @@ const Operations: React.FC = () => {
                                     >
                                         <option value="">Select a product...</option>
                                         {products.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name} (Current: {p.stock})</option>
+                                            <option key={p.id} value={p.id}>{p.name} (Current: {p.quantity})</option>
                                         ))}
                                     </select>
                                 </div>

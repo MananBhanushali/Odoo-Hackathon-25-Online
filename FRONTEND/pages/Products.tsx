@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { useData } from '../context/DataContext';
 
 const Products: React.FC = () => {
-  const { products, addProduct, updateProduct, deleteProduct, addOperation, validateOperation } = useData();
+    const { products, addProduct, updateProduct, deleteProduct, addOperation, validateOperation, warehouses, locations } = useData();
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState('');
   const { showToast } = useToast();
@@ -18,14 +18,15 @@ const Products: React.FC = () => {
   // Product Form State (Unified for Add & Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<Product>>({
+    const [formData, setFormData] = useState<Partial<Product>>({
     category: 'Raw Material',
     status: 'In Stock',
-    minStock: 10,
-    stock: 0,
+    minThreshold: 10,
+    quantity: 0,
     price: 0,
-    location: 'WH/Stock'
+    locationId: null
   });
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
 
   // Quick Restock State
   const [restockProduct, setRestockProduct] = useState<Product | null>(null);
@@ -41,60 +42,69 @@ const Products: React.FC = () => {
 
   // -- Handlers --
 
-  const handleOpenAdd = () => {
+    const handleOpenAdd = () => {
     setEditingId(null);
     setFormData({
         category: 'Raw Material',
         status: 'In Stock',
-        minStock: 10,
-        stock: 0,
+        minThreshold: 10,
+        quantity: 0,
         price: 0,
-        location: 'WH/Stock'
+        locationId: null
     });
+        setSelectedWarehouseId('');
     setIsFormOpen(true);
   };
 
-  const handleOpenEdit = (product: Product) => {
+    const handleOpenEdit = (product: Product) => {
     setEditingId(product.id);
     setFormData({ ...product });
+        // Derive warehouse from existing location
+        if (product.locationId) {
+            const loc = locations.find(l => l.id === product.locationId);
+            if (loc) setSelectedWarehouseId(loc.warehouseId);
+        } else {
+            setSelectedWarehouseId('');
+        }
     setIsFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if(window.confirm('Are you sure you want to delete this product?')) {
-        deleteProduct(id);
+        await deleteProduct(id);
         showToast('Product deleted', 'info');
     }
   }
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.sku) {
         showToast('Name and SKU are required', 'error');
         return;
     }
     
-    const productData: Product = {
-        id: editingId || Date.now().toString(),
+    const productData: Partial<Product> = {
         name: formData.name,
         sku: formData.sku,
         category: formData.category || 'Uncategorized',
-        stock: Number(formData.stock) || 0,
-        minStock: Number(formData.minStock) || 0,
+        quantity: Number(formData.quantity) || 0,
+        minThreshold: Number(formData.minThreshold) || 0,
         price: Number(formData.price) || 0,
-        location: formData.location || 'WH/Stock',
-        status: (Number(formData.stock) || 0) === 0 ? 'Out of Stock' : (Number(formData.stock) || 0) <= (Number(formData.minStock) || 0) ? 'Low Stock' : 'In Stock'
+        locationId: formData.locationId || null,
     };
 
-    if (editingId) {
-        updateProduct(productData);
-        showToast('Product updated successfully', 'success');
-    } else {
-        addProduct(productData);
-        showToast('New product created', 'success');
+    try {
+        if (editingId) {
+            await updateProduct(editingId, productData);
+            showToast('Product updated successfully', 'success');
+        } else {
+            await addProduct(productData);
+            showToast('New product created', 'success');
+        }
+        setIsFormOpen(false);
+    } catch (error) {
+        // Toast handled in context
     }
-    
-    setIsFormOpen(false);
   };
 
   const handleRestockSubmit = (e: React.FormEvent) => {
@@ -228,9 +238,9 @@ const Products: React.FC = () => {
       <div className={`grid ${view === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'} gap-6`}>
         <AnimatePresence mode="popLayout">
           {filteredProducts.map((product, idx) => {
-            const stockPercentage = Math.min(100, (product.stock / (product.minStock * 3 || 100)) * 100);
-            const isLowStock = product.stock <= product.minStock;
-            const isOutStock = product.stock === 0;
+            const stockPercentage = Math.min(100, (product.quantity / (product.minThreshold * 3 || 100)) * 100);
+            const isLowStock = product.quantity <= product.minThreshold;
+            const isOutStock = product.quantity === 0;
             
             return (
             <motion.div
@@ -276,7 +286,7 @@ const Products: React.FC = () => {
                         <div className="space-y-2 mb-6">
                             <div className="flex justify-between text-xs mb-1 font-medium">
                                 <span className="text-slate-500 dark:text-gray-400">Stock Level</span>
-                                <span className={`${isLowStock ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>{product.stock} <span className="text-slate-400 font-normal">/ {product.minStock} min</span></span>
+                                <span className={`${isLowStock ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>{product.quantity} <span className="text-slate-400 font-normal">/ {product.minThreshold} min</span></span>
                             </div>
                             <div className="w-full h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
                                 <motion.div 
@@ -331,7 +341,7 @@ const Products: React.FC = () => {
                     <div className="hidden md:flex items-center gap-8 flex-[4]">
                          <div className="text-sm text-slate-600 dark:text-gray-400 w-32">{product.category}</div>
                          <div className="text-sm text-slate-600 dark:text-gray-400 flex items-center gap-1 w-32">
-                             <MapPin size={12} /> {product.location}
+                             <MapPin size={12} /> {product.location?.name || 'N/A'}
                          </div>
                     </div>
 
@@ -340,7 +350,7 @@ const Products: React.FC = () => {
                             <div className="w-full h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
                                 <div className={`h-full ${isLowStock ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${stockPercentage}%` }}></div>
                             </div>
-                            <div className="text-[10px] text-right text-slate-500">{product.stock} units</div>
+                            <div className="text-[10px] text-right text-slate-500">{product.quantity} units</div>
                         </div>
                         
                         <div className="text-right w-20">
@@ -428,13 +438,45 @@ const Products: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1">Location</label>
-                                    <div className="relative">
-                                        <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input value={formData.location || ''} onChange={e => setFormData({...formData, location: e.target.value})} className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 pl-10 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="e.g. A-12-04" />
-                                    </div>
-                                </div>
+                                                                {/* Warehouse Selection */}
+                                                                <div>
+                                                                        <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1">Warehouse</label>
+                                                                        <select
+                                                                            value={selectedWarehouseId}
+                                                                            onChange={e => {
+                                                                                const wid = e.target.value;
+                                                                                setSelectedWarehouseId(wid);
+                                                                                // Reset location when warehouse changes
+                                                                                setFormData({ ...formData, locationId: null });
+                                                                            }}
+                                                                            className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                                                                        >
+                                                                            <option value="">Select warehouse...</option>
+                                                                            {warehouses.map(w => (
+                                                                                <option key={w.id} value={w.id}>{w.name} ({w.shortCode})</option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <p className="text-[10px] text-slate-400 mt-1">Choose the warehouse to narrow available locations.</p>
+                                                                </div>
+                                                                {/* Location Selection */}
+                                                                <div>
+                                                                        <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1">Location</label>
+                                                                        <select
+                                                                            value={formData.locationId || ''}
+                                                                            onChange={e => setFormData({ ...formData, locationId: e.target.value || null })}
+                                                                            disabled={!selectedWarehouseId}
+                                                                            className="w-full bg-slate-100 dark:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                                                                        >
+                                                                            <option value="">{selectedWarehouseId ? 'Select location...' : 'Select warehouse first'}</option>
+                                                                            {locations.filter(l => l.warehouseId === selectedWarehouseId).map(l => (
+                                                                                <option key={l.id} value={l.id}>{l.name} ({l.shortCode})</option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <p className="text-[10px] text-slate-400 mt-1">Filtered by selected warehouse. Manage locations in Settings.</p>
+                                                                        {selectedWarehouseId && locations.filter(l => l.warehouseId === selectedWarehouseId).length === 0 && (
+                                                                            <p className="text-[10px] text-red-500 mt-1">No locations found for this warehouse.</p>
+                                                                        )}
+                                                                </div>
 
                                 {/* Inventory Settings */}
                                 <div className="md:col-span-2 p-4 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 space-y-4">
@@ -444,12 +486,12 @@ const Products: React.FC = () => {
                                     <div className="grid grid-cols-2 gap-6">
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1">Current Stock</label>
-                                            <input type="number" value={formData.stock || ''} onChange={e => setFormData({...formData, stock: parseInt(e.target.value)})} className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="0" />
+                                            <input type="number" value={formData.quantity || ''} onChange={e => setFormData({...formData, quantity: parseInt(e.target.value)})} className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="0" />
                                             <p className="text-[10px] text-slate-400 mt-1">Initial quantity on hand.</p>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1">Min. Threshold</label>
-                                            <input type="number" value={formData.minStock || ''} onChange={e => setFormData({...formData, minStock: parseInt(e.target.value)})} className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="10" />
+                                            <input type="number" value={formData.minThreshold || ''} onChange={e => setFormData({...formData, minThreshold: parseInt(e.target.value)})} className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="10" />
                                             <p className="text-[10px] text-slate-400 mt-1">Alert triggered below this value.</p>
                                         </div>
                                     </div>
@@ -496,12 +538,12 @@ const Products: React.FC = () => {
                         <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-200 dark:border-white/10 flex justify-between items-center">
                             <div className="flex flex-col">
                                 <span className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wider font-bold">Current Stock</span>
-                                <span className="text-2xl font-bold text-slate-900 dark:text-white font-mono">{restockProduct.stock}</span>
+                                <span className="text-2xl font-bold text-slate-900 dark:text-white font-mono">{restockProduct.quantity}</span>
                             </div>
                             <div className="h-8 w-[1px] bg-slate-200 dark:bg-white/10"></div>
                             <div className="flex flex-col items-end">
                                 <span className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wider font-bold">Min Limit</span>
-                                <span className="text-lg font-medium text-slate-600 dark:text-gray-400 font-mono">{restockProduct.minStock}</span>
+                                <span className="text-lg font-medium text-slate-600 dark:text-gray-400 font-mono">{restockProduct.minThreshold}</span>
                             </div>
                         </div>
                         
