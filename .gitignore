@@ -7,6 +7,8 @@ FRONTEND/yarn-error.log*
 FRONTEND/pnpm-debug.log*
 FRONTEND/lerna-debug.log*
 
+FRONTEND/package-lock.json
+
 # Dependencies
 FRONTEND/node_modules
 
