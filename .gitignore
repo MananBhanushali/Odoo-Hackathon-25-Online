@@ -1,18 +1,23 @@
 # Logs
-logs
+FRONTEND/logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+FRONTEND/npm-debug.log*
+FRONTEND/yarn-debug.log*
+FRONTEND/yarn-error.log*
+FRONTEND/pnpm-debug.log*
+FRONTEND/lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependencies
+FRONTEND/node_modules
 
-# Editor directories and files
+# Build Output
+FRONTEND/dist
+FRONTEND/dist-ssr
+
+# Environment / Local Config
+FRONTEND/*.local
+
+# Editor directories and files (Keep global)
 .vscode/*
 !.vscode/extensions.json
 .idea
