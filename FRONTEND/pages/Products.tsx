@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Search, Plus, MapPin, Box, X, PackagePlus, Pencil, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
-import { Product, Operation } from '../types';
+import { Search, Plus, MapPin, Box, X, Pencil, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Product } from '../types';
 import Card from '../components/ui/Card';
 import { ShimmerButton } from '../components/ui/ShimmerButton';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { useData } from '../context/DataContext';
 
 const Products: React.FC = () => {
-    const { products, addProduct, updateProduct, deleteProduct, addOperation, validateOperation, warehouses, locations } = useData();
+    const { products, addProduct, updateProduct, deleteProduct, warehouses, locations } = useData();
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState('');
   const { showToast } = useToast();
@@ -29,10 +29,6 @@ const Products: React.FC = () => {
     locationId: null
   });
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
-
-  // Quick Restock State
-  const [restockProduct, setRestockProduct] = useState<Product | null>(null);
-  const [restockQty, setRestockQty] = useState(1);
 
     const filteredProducts = products.filter(p => {
         const matchesCategory = (activeCategory === 'All' || p.category === activeCategory);
@@ -123,33 +119,7 @@ const Products: React.FC = () => {
     }
   };
 
-  const handleRestockSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!restockProduct) return;
 
-    const newOp: Operation = {
-        id: Date.now().toString(),
-        reference: `WH/IN/Q${Math.floor(Math.random() * 10000)}`,
-        type: 'Receipt',
-        source: 'Direct/Vendor',
-        destination: 'WH/Stock',
-        contact: 'Quick Restock',
-        status: 'Draft',
-        scheduleDate: new Date().toISOString().split('T')[0],
-        items: [{
-            productId: restockProduct.id,
-            quantity: restockQty,
-            done: restockQty
-        }]
-    };
-
-    addOperation(newOp);
-    validateOperation(newOp);
-    
-    showToast(`Stock updated: +${restockQty} for ${restockProduct.name}`, 'success');
-    setRestockProduct(null);
-    setRestockQty(1);
-  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -357,13 +327,6 @@ const Products: React.FC = () => {
                                 >
                                     <Pencil size={16} />
                                 </button>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); setRestockProduct(product); setRestockQty(1); }}
-                                    className="p-2 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-400 transition-colors"
-                                    title="Quick Restock"
-                                >
-                                    <PackagePlus size={16} />
-                                </button>
                             </div>
                         </div>
                    </div>
@@ -410,12 +373,6 @@ const Products: React.FC = () => {
                                 className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-400 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                             >
                                 <Pencil size={16} />
-                            </button>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); setRestockProduct(product); setRestockQty(1); }}
-                                className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg text-slate-400 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                            >
-                                <PackagePlus size={16} />
                             </button>
                              <button 
                                 onClick={(e) => { e.stopPropagation(); handleDelete(product.id); }}
@@ -558,83 +515,7 @@ const Products: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Quick Restock Modal */}
-      <AnimatePresence>
-        {restockProduct && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <motion.div 
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                    onClick={() => setRestockProduct(null)}
-                />
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    className="relative bg-white dark:bg-[#0F172A] w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden"
-                >
-                    <div className="p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-                        <div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Quick Restock</h3>
-                            <p className="text-sm text-slate-500 dark:text-gray-400">Add inventory to <span className="text-blue-500 font-medium">{restockProduct.name}</span></p>
-                        </div>
-                        <button onClick={() => setRestockProduct(null)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white"><X size={20} /></button>
-                    </div>
-                    
-                    <form onSubmit={handleRestockSubmit} className="p-6 space-y-6">
-                        <div className="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-200 dark:border-white/10 flex justify-between items-center">
-                            <div className="flex flex-col">
-                                <span className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wider font-bold">Current Stock</span>
-                                <span className="text-2xl font-bold text-slate-900 dark:text-white font-mono">{restockProduct.quantity}</span>
-                            </div>
-                            <div className="h-8 w-[1px] bg-slate-200 dark:bg-white/10"></div>
-                            <div className="flex flex-col items-end">
-                                <span className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wider font-bold">Min Limit</span>
-                                <span className="text-lg font-medium text-slate-600 dark:text-gray-400 font-mono">{restockProduct.minThreshold}</span>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-2">Quantity to Add</label>
-                            <div className="relative flex items-center">
-                                 <button 
-                                    type="button"
-                                    onClick={() => setRestockQty(Math.max(1, restockQty - 1))}
-                                    className="absolute left-2 p-2 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20"
-                                 >
-                                     <div className="w-4 h-0.5 bg-current"></div>
-                                 </button>
-                                 <input 
-                                    type="number" 
-                                    min="1" 
-                                    autoFocus
-                                    required 
-                                    value={restockQty} 
-                                    onChange={e => setRestockQty(Math.max(1, parseInt(e.target.value) || 0))} 
-                                    className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-4 text-center text-slate-900 dark:text-white outline-none focus:border-blue-500 font-mono text-2xl font-bold" 
-                                 />
-                                 <button 
-                                    type="button"
-                                    onClick={() => setRestockQty(restockQty + 1)}
-                                    className="absolute right-2 p-2 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20"
-                                 >
-                                     <Plus size={16} />
-                                 </button>
-                            </div>
-                        </div>
-                        
-                        <div className="pt-2 flex gap-3">
-                            <button type="button" onClick={() => setRestockProduct(null)} className="flex-1 px-4 py-3 text-slate-600 dark:text-gray-300 font-medium hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors">Cancel</button>
-                            <button type="submit" className="flex-[2] px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95">
-                                <PackagePlus size={20} />
-                                Confirm Restock
-                            </button>
-                        </div>
-                    </form>
-                </motion.div>
-            </div>
-        )}
-      </AnimatePresence>
+
     </div>
   );
 };

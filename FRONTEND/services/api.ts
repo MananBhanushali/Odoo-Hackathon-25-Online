@@ -46,4 +46,13 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
+  patch: async (endpoint: string, body: any) => {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
 };

@@ -1,15 +1,35 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, ArrowUpRight, ArrowDownLeft, ArrowRightLeft } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { useData } from '../context/DataContext';
 
 const MoveHistory: React.FC = () => {
-  const { moves } = useData();
-  const [search, setSearch] = useState('');
+    const { moves, products } = useData();
+    const [search, setSearch] = useState('');
+    const [direction, setDirection] = useState<'all' | 'in' | 'out' | 'internal'>('all');
+    const [productId, setProductId] = useState<string>('');
+    const [remoteMoves, setRemoteMoves] = useState(moves);
+
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            try {
+                const svc = await import('../services/moveService');
+                const params: any = {};
+                if (direction !== 'all') params.direction = direction;
+                if (productId) params.productId = productId;
+                const data = await svc.moveService.list(params);
+                if (active) setRemoteMoves(data);
+            } catch (e) {
+                console.error('Failed to fetch filtered moves', e);
+            }
+        })();
+        return () => { active = false; };
+    }, [direction, productId]);
 
   // Sort moves by date descending
-  const sortedMoves = [...moves].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sortedMoves = [...remoteMoves].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const filteredMoves = sortedMoves.filter(m => 
     m.reference.toLowerCase().includes(search.toLowerCase()) ||
@@ -25,7 +45,7 @@ const MoveHistory: React.FC = () => {
          </div>
       </div>
 
-      <Card className="p-4 flex gap-4 !bg-white dark:!bg-glass-100/50 items-center" noPadding>
+    <Card className="p-4 flex flex-wrap gap-4 !bg-white dark:!bg-glass-100/50 items-center" noPadding>
          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-400" size={18} />
             <input 
@@ -36,9 +56,28 @@ const MoveHistory: React.FC = () => {
                 onChange={(e) => setSearch(e.target.value)}
             />
          </div>
-         <button className="p-2.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl text-slate-500 dark:text-gray-300 transition-colors">
-            <Filter size={20} />
-         </button>
+                 <div className="flex items-center gap-2">
+                     <select
+                         value={direction}
+                         onChange={e => setDirection(e.target.value as any)}
+                         className="bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm"
+                     >
+                         <option value="all">All Directions</option>
+                         <option value="in">Inbound</option>
+                         <option value="out">Outbound</option>
+                         <option value="internal">Internal</option>
+                     </select>
+                     <select
+                         value={productId}
+                         onChange={e => setProductId(e.target.value)}
+                         className="bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm"
+                     >
+                         <option value="">All Products</option>
+                         {products.map(p => (
+                             <option key={p.id} value={p.id}>{p.sku}</option>
+                         ))}
+                     </select>
+                 </div>
       </Card>
 
       <div className="bg-white dark:bg-glass-100 border border-slate-200 dark:border-glass-border rounded-2xl overflow-hidden">

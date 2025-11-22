@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Operation, OperationStatus } from '../types';
-import { List, Kanban, Plus, Printer, X, ChevronRight, Clock, CheckCircle2, AlertOctagon, Loader2 } from 'lucide-react';
+import { List, Kanban, Printer, X, ChevronRight, Clock, CheckCircle2, AlertOctagon, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Card from '../components/ui/Card';
 import { ShimmerButton } from '../components/ui/ShimmerButton';
@@ -9,9 +9,9 @@ import { useToast } from '../context/ToastContext';
 import { useData } from '../context/DataContext';
 
 const Operations: React.FC = () => {
-  const { operations, products, addOperation, updateOperation, validateOperation } = useData();
+    const { operations, products, addOperation, updateOperation, validateOperation, warehouses, locations } = useData();
   const { showToast } = useToast();
-  const [view, setView] = useState<'kanban' | 'list'>('list');
+    const [view, setView] = useState<'kanban' | 'list'>('list');
   const [selectedOp, setSelectedOp] = useState<Operation | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeType, setActiveType] = useState<'All' | 'Receipt' | 'Delivery' | 'Internal' | 'Adjustment'>('All');
@@ -20,72 +20,52 @@ const Operations: React.FC = () => {
   const statuses: OperationStatus[] = ['Draft', 'Waiting', 'Ready', 'Done'];
   const filteredOps = operations.filter(op => activeType === 'All' || op.type === activeType);
 
-  const handleNewOperation = (type: string) => {
-    const newOp: Operation = {
-      id: Date.now().toString(),
-      reference: `WH/${type.substring(0,3).toUpperCase()}/${Date.now().toString().slice(-4)}`,
-      type: type as any,
-      source: type === 'Receipt' ? 'Vendor' : 'WH/Stock',
-      destination: type === 'Delivery' ? 'Customer' : 'WH/Stock',
-      contact: '',
-      status: 'Draft',
-      scheduleDate: new Date().toISOString().split('T')[0],
-      items: []
-    };
-    
-    addOperation(newOp);
-    setSelectedOp(newOp);
-    setIsFormOpen(true);
-    showToast(`New ${type} draft created`, 'info');
-  };
+    // Creation moved to dedicated pages
 
-  const handleStatusChange = (op: Operation, newStatus: OperationStatus) => {
-    if (newStatus === 'Done') {
-        handleValidate(op);
-        return;
-    }
-    
-    const updated = { ...op, status: newStatus };
-    updateOperation(updated);
-    setSelectedOp(updated);
-  };
 
-  const handleValidate = (op: Operation) => {
+
+  const handleCompleteReceipt = (op: Operation) => {
     if (op.items.length === 0) {
-        showToast('Cannot validate empty operation', 'error');
+        showToast('Cannot complete empty operation', 'error');
         return;
     }
-
     setIsValidating(true);
     setTimeout(() => {
         validateOperation(op);
         setIsValidating(false);
-        // Update local selected op to reflect change
         setSelectedOp({...op, status: 'Done'});
-        showToast('Operation validated & stock updated', 'success');
+        showToast('Receipt completed & stock increased', 'success');
     }, 800);
   };
 
-  const addItemToOp = (op: Operation, productId: string) => {
-     const exists = op.items.find(i => i.productId === productId);
-     if (exists) return;
-
-     const updatedOp = {
-         ...op,
-         items: [...op.items, { productId, quantity: 1, done: 1 }]
-     };
-     updateOperation(updatedOp);
-     setSelectedOp(updatedOp);
+  const canCompleteDelivery = (op: Operation) => {
+    return op.items.every(item => {
+      const product = products.find(p => p.id === item.productId);
+      return product && product.quantity >= item.quantity;
+    });
   };
 
-  const updateItemQty = (op: Operation, productId: string, qty: number) => {
-     const updatedOp = {
-         ...op,
-         items: op.items.map(i => i.productId === productId ? { ...i, quantity: qty, done: qty } : i)
-     };
-     updateOperation(updatedOp);
-     setSelectedOp(updatedOp);
+  const handleCompleteDelivery = (op: Operation) => {
+    if (op.items.length === 0) {
+        showToast('Cannot complete empty operation', 'error');
+        return;
+    }
+    if (!canCompleteDelivery(op)) {
+        showToast('Cannot complete delivery - insufficient stock', 'error');
+        return;
+    }
+    setIsValidating(true);
+    setTimeout(() => {
+        validateOperation(op);
+        setIsValidating(false);
+        setSelectedOp({...op, status: 'Done'});
+        showToast('Delivery completed & stock reduced', 'success');
+    }, 800);
   };
+
+
+
+
 
   return (
     <div className="h-full flex flex-col relative space-y-6">
@@ -110,18 +90,11 @@ const Operations: React.FC = () => {
                 <Kanban size={20} />
             </button>
           </div>
-          <ShimmerButton
-             onClick={() => handleNewOperation('Delivery')}
-             background="linear-gradient(90deg, #2563EB, #0891B2)"
-             shimmerColor="rgba(255,255,255,0.4)"
-             className="shadow-lg shadow-blue-500/20 !rounded-xl"
-             borderRadius="12px"
-          >
-            <div className="flex items-center gap-2 text-white">
-                <Plus size={20} />
-                <span className="font-bold">New Transfer</span>
-            </div>
-          </ShimmerButton>
+                    <div className="hidden md:flex items-center gap-3 text-xs text-slate-500 dark:text-gray-400">
+                        <span>Use dedicated pages:</span>
+                        <a href="/operations/receipt/new" className="px-2 py-1 rounded bg-green-600/10 text-green-600 dark:text-green-400 font-mono border border-green-600/20 hover:bg-green-600/20">Receipt</a>
+                        <a href="/operations/delivery/new" className="px-2 py-1 rounded bg-blue-600/10 text-blue-600 dark:text-blue-400 font-mono border border-blue-600/20 hover:bg-blue-600/20">Delivery</a>
+                    </div>
         </div>
       </div>
 
@@ -154,16 +127,11 @@ const Operations: React.FC = () => {
                         <th className="p-5">Contact</th>
                         <th className="p-5">Schedule</th>
                         <th className="p-5">Route</th>
-                        <th className="p-5">Progress</th>
                         <th className="p-5">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                       {filteredOps.map(op => {
-                        const totalItems = op.items.reduce((acc, i) => acc + i.quantity, 0);
-                        const doneItems = op.items.reduce((acc, i) => acc + i.done, 0);
-                        const progress = totalItems > 0 ? (doneItems / totalItems) * 100 : 0;
-                        
                         return (
                         <tr 
                           key={op.id} 
@@ -187,18 +155,6 @@ const Operations: React.FC = () => {
                                   <ChevronRight size={12} />
                                   <span className="bg-slate-100 dark:bg-white/5 px-2 py-1 rounded border border-slate-200 dark:border-white/5">{op.destination}</span>
                               </div>
-                          </td>
-                          <td className="p-5 w-48">
-                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400 mb-1">
-                                <span>{doneItems}/{totalItems}</span>
-                                <span>Done</span>
-                            </div>
-                            <div className="w-full bg-slate-200 dark:bg-black/40 rounded-full h-1.5">
-                                <div 
-                                    className={`h-1.5 rounded-full ${op.status === 'Done' ? 'bg-green-500' : 'bg-blue-500'}`} 
-                                    style={{ width: `${progress}%` }}
-                                ></div>
-                            </div>
                           </td>
                           <td className="p-5">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${
@@ -309,56 +265,37 @@ const Operations: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
-                    {/* Status Stepper */}
-                    <div className="w-full bg-slate-100 dark:bg-glass-100 rounded-xl p-1 flex overflow-x-auto">
-                        {statuses.map((status, idx) => {
-                             const isActive = selectedOp.status === status;
-                             const isPast = statuses.indexOf(selectedOp.status) > idx;
-                             
-                             return (
-                                <button 
-                                    key={status}
-                                    onClick={() => handleStatusChange(selectedOp, status)}
-                                    disabled={selectedOp.status === 'Done'}
-                                    className={`flex-1 py-2 px-4 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
-                                        isActive ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-sm dark:shadow-lg dark:shadow-blue-500/20' : 
-                                        isPast ? 'text-blue-600 dark:text-blue-400' :
-                                        'text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white'
-                                    } ${selectedOp.status === 'Done' && !isActive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                >
-                                    {status}
-                                </button>
-                             );
-                        })}
-                    </div>
-
                     {/* Action Buttons */}
                     <div className="flex gap-3">
-                        {selectedOp.status !== 'Done' && (
-                            <div className="flex-1">
-                                <ShimmerButton 
-                                    onClick={() => handleValidate(selectedOp)}
-                                    disabled={isValidating}
-                                    className="w-full shadow-lg shadow-green-500/20"
-                                    background="linear-gradient(90deg, #16a34a, #10b981)"
-                                    shimmerColor="#a7f3d0"
-                                    borderRadius="12px"
-                                >
-                                    <div className="flex items-center justify-center gap-2 text-white font-bold">
-                                        {isValidating ? (
-                                            <>
-                                                <Loader2 size={20} className="animate-spin" />
-                                                Validating...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CheckCircle2 size={20} />
-                                                Validate Operation
-                                            </>
-                                        )}
-                                    </div>
-                                </ShimmerButton>
-                            </div>
+                        {selectedOp.type === 'Receipt' && selectedOp.status === 'Draft' && (
+                            <ShimmerButton 
+                                onClick={() => handleCompleteReceipt(selectedOp)}
+                                disabled={isValidating}
+                                className="flex-1 shadow-lg shadow-green-500/20"
+                                background="linear-gradient(90deg, #16a34a, #10b981)"
+                                shimmerColor="#a7f3d0"
+                                borderRadius="12px"
+                            >
+                                <div className="flex items-center justify-center gap-2 text-white font-bold">
+                                    {isValidating ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
+                                    {isValidating ? 'Processing...' : 'Mark as Done'}
+                                </div>
+                            </ShimmerButton>
+                        )}
+                        {selectedOp.type === 'Delivery' && selectedOp.status === 'Ready' && (
+                            <ShimmerButton 
+                                onClick={() => handleCompleteDelivery(selectedOp)}
+                                disabled={isValidating || !canCompleteDelivery(selectedOp)}
+                                className="flex-1 shadow-lg shadow-blue-500/20"
+                                background="linear-gradient(90deg, #2563EB, #1D4ED8)"
+                                shimmerColor="#fff"
+                                borderRadius="12px"
+                            >
+                                <div className="flex items-center justify-center gap-2 text-white font-bold">
+                                    {isValidating ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
+                                    {isValidating ? 'Processing...' : canCompleteDelivery(selectedOp) ? 'Complete Delivery' : 'Insufficient Stock'}
+                                </div>
+                            </ShimmerButton>
                         )}
                          <ShimmerButton 
                             onClick={() => showToast('Print job sent to printer', 'success')}
@@ -380,10 +317,14 @@ const Operations: React.FC = () => {
                             <input 
                                 type="text"
                                 value={selectedOp.contact}
-                                onChange={e => {
-                                    const up = {...selectedOp, contact: e.target.value};
-                                    setSelectedOp(up);
-                                    updateOperation(up);
+                                onChange={async e => {
+                                    const newContact = e.target.value;
+                                    setSelectedOp({...selectedOp, contact: newContact});
+                                    if (selectedOp.status !== 'Done') {
+                                        try {
+                                            await updateOperation(selectedOp.id, { contact: newContact });
+                                        } catch {}
+                                    }
                                 }}
                                 disabled={selectedOp.status === 'Done'}
                                 className="w-full bg-slate-100 dark:bg-white/5 rounded-xl px-4 py-3 text-slate-900 dark:text-white border border-slate-200 dark:border-white/5 outline-none focus:border-blue-500"
@@ -412,31 +353,26 @@ const Operations: React.FC = () => {
                                 <thead className="bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                                     <tr>
                                         <th className="p-4 pl-6">Product</th>
-                                        <th className="p-4">Demand</th>
-                                        <th className="p-4">Done</th>
+                                        <th className="p-4">Quantity</th>
+                                        <th className="p-4">Available</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 dark:divide-white/5">
                                     {selectedOp.items.map((item, i) => {
                                         const product = products.find(p => p.id === item.productId);
+                                        const insufficient = selectedOp.type === 'Delivery' && product && item.quantity > product.quantity;
                                         return (
-                                            <tr key={i} className="group hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                                            <tr key={i} className={`group hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${insufficient ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
                                                 <td className="p-4 pl-6">
                                                     <div className="font-medium text-slate-900 dark:text-white">{product?.name}</div>
                                                     <div className="text-xs text-blue-600 dark:text-blue-400 font-mono">[{product?.sku}]</div>
                                                 </td>
-                                                <td className="p-4 text-slate-600 dark:text-gray-300">{item.quantity}</td>
+                                                <td className="p-4 text-slate-600 dark:text-gray-300 font-mono">{item.quantity}</td>
                                                 <td className="p-4">
-                                                    {selectedOp.status === 'Done' ? (
-                                                        <span className="text-green-600 dark:text-green-400 font-bold">{item.done}</span>
-                                                    ) : (
-                                                        <input 
-                                                            type="number" 
-                                                            value={item.done}
-                                                            onChange={(e) => updateItemQty(selectedOp, item.productId, Number(e.target.value))}
-                                                            className="w-20 bg-white dark:bg-black/40 border border-slate-300 dark:border-white/10 rounded px-2 py-1 text-slate-900 dark:text-white text-center" 
-                                                        />
-                                                    )}
+                                                    <span className={`font-mono ${insufficient ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-gray-300'}`}>
+                                                        {product?.quantity || 0}
+                                                    </span>
+                                                    {insufficient && <div className="text-xs text-red-600 dark:text-red-400 mt-1">Insufficient stock</div>}
                                                 </td>
                                             </tr>
                                         );
@@ -451,25 +387,7 @@ const Operations: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
-                        {selectedOp.status !== 'Done' && (
-                            <div className="mt-4 p-4 border border-slate-200 dark:border-white/10 rounded-xl bg-slate-50 dark:bg-white/5">
-                                <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-2">Add Product</label>
-                                <div className="flex gap-2">
-                                    <select 
-                                        className="flex-1 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-white/10 rounded-lg px-3 py-2 text-slate-900 dark:text-white"
-                                        onChange={(e) => {
-                                            if(e.target.value) addItemToOp(selectedOp, e.target.value);
-                                            e.target.value = "";
-                                        }}
-                                    >
-                                        <option value="">Select a product...</option>
-                                        {products.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name} (Current: {p.quantity})</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        )}
+
                     </div>
                 </div>
             </motion.div>

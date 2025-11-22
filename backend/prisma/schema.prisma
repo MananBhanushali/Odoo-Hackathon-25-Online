@@ -54,6 +54,12 @@ model Location {
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   products    Product[]
 
+  // Back-relations for operations (from/to) and moves (from/to)
+  operationsFrom Operation[] @relation("OperationFromLocation")
+  operationsTo   Operation[] @relation("OperationToLocation")
+  movesFrom      Move[]      @relation("MoveFromLocation")
+  movesTo        Move[]      @relation("MoveToLocation")
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -70,6 +76,115 @@ model Product {
   locationId   String?
   location     Location? @relation(fields: [locationId], references: [id])
 
+  operationItems OperationItem[]
+  moves          Move[]
+  alerts         Alert[]
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+// --- Inventory Operations & Movements ---
+
+enum OperationType {
+  RECEIPT
+  DELIVERY
+  INTERNAL
+  ADJUSTMENT
+}
+
+enum OperationStatus {
+  DRAFT
+  WAITING
+  READY
+  DONE
+  CANCELLED
+}
+
+enum MoveDirection {
+  IN
+  OUT
+  INTERNAL
+}
+
+enum MoveStatus {
+  DONE
+  CANCELLED
+}
+
+model Operation {
+  id            String          @id @default(uuid())
+  reference     String          @unique
+  type          OperationType
+  status        OperationStatus @default(DRAFT)
+  contact       String?
+  scheduleDate  DateTime
+
+  fromLocationId String?
+  toLocationId   String?
+  fromLocation   Location?       @relation("OperationFromLocation", fields: [fromLocationId], references: [id])
+  toLocation     Location?       @relation("OperationToLocation", fields: [toLocationId], references: [id])
+
+  items OperationItem[]
+  moves Move[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type, status])
+  @@index([scheduleDate])
+}
+
+model OperationItem {
+  id           String    @id @default(uuid())
+  operationId  String
+  productId    String
+  quantity     Int
+  done         Int       @default(0)
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([operationId])
+  @@index([productId])
+}
+
+model Move {
+  id             String       @id @default(uuid())
+  operationId    String?
+  productId      String
+  fromLocationId String?
+  toLocationId   String?
+  quantity       Int
+  direction      MoveDirection
+  contact        String?
+  status         MoveStatus    @default(DONE)
+
+  operation Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fromLocation Location? @relation("MoveFromLocation", fields: [fromLocationId], references: [id])
+  toLocation   Location? @relation("MoveToLocation", fields: [toLocationId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([operationId])
+  @@index([productId])
+  @@index([direction])
+}
+
+// Low stock alerts
+model Alert {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity   Int      // quantity at time of alert
+  threshold  Int      // threshold that triggered
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([productId, resolved])
 }

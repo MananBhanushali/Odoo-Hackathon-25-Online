@@ -34,3 +34,21 @@ export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction
 
 // Alias expected by route files
 export const protect = authenticate;
+ 
+// Permission middleware using Permissions model booleans
+export const requirePermission = (permKey: keyof import('../../prisma/schema.prisma').Permissions | 'operations') => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+      const perms = await prisma.permissions.findUnique({ where: { userId: req.user.id } });
+      if (!perms) return res.status(403).json({ error: 'Permissions not assigned' });
+      // Fallback for key mapping
+      const key = permKey === 'operations' ? 'operations' : permKey;
+      if (!(perms as any)[key]) return res.status(403).json({ error: 'Permission denied' });
+      next();
+    } catch (e) {
+      console.error(e);
+      return res.status(500).json({ error: 'Permission check failed' });
+    }
+  };
+};

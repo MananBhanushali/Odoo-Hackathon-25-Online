@@ -5,6 +5,8 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Operations from './pages/Operations';
+import NewReceipt from './pages/NewReceipt';
+import NewDelivery from './pages/NewDelivery';
 import MoveHistory from './pages/MoveHistory';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
@@ -171,6 +173,8 @@ const AnimatedRoutes: React.FC = () => {
         <Route path="/dashboard" element={<ProtectedRoute permission="dashboard"><PageTransition><Dashboard /></PageTransition></ProtectedRoute>} />
         <Route path="/products" element={<ProtectedRoute permission="inventory"><PageTransition><Products /></PageTransition></ProtectedRoute>} />
         <Route path="/operations" element={<ProtectedRoute permission="operations"><PageTransition><Operations /></PageTransition></ProtectedRoute>} />
+        <Route path="/operations/receipt/new" element={<ProtectedRoute permission="operations"><PageTransition><NewReceipt /></PageTransition></ProtectedRoute>} />
+        <Route path="/operations/delivery/new" element={<ProtectedRoute permission="operations"><PageTransition><NewDelivery /></PageTransition></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute permission="audit_log"><PageTransition><MoveHistory /></PageTransition></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute permission="settings"><PageTransition><Settings /></PageTransition></ProtectedRoute>} />
         <Route path="/admin-dashboard" element={<ProtectedRoute permission="user_mgmt"><PageTransition><AdminDashboard /></PageTransition></ProtectedRoute>} />

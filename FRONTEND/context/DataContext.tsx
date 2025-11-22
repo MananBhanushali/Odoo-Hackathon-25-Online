@@ -1,9 +1,11 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Product, Operation, Move, Warehouse, Location, KPIData } from '../types';
-import { MOCK_OPERATIONS, MOCK_MOVES, MOCK_LOCATIONS } from '../constants';
+import { MOCK_LOCATIONS } from '../constants';
 import { productService } from '../services/productService';
 import { warehouseService } from '../services/warehouseService';
+import { operationService } from '../services/operationService';
+import { moveService } from '../services/moveService';
 import { useToast } from './ToastContext';
 
 interface DataContextType {
@@ -16,8 +18,8 @@ interface DataContextType {
   addProduct: (p: Partial<Product>) => Promise<void>;
   updateProduct: (id: string, p: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
-  addOperation: (o: Operation) => void;
-  updateOperation: (o: Operation) => void;
+  addOperation: (type: 'Receipt' | 'Delivery', scheduleDate: string, locationId: string, contact?: string, items?: { productId: string; quantity: number }[]) => Promise<Operation>;
+  updateOperation: (id: string, payload: { contact?: string; items?: { productId: string; quantity: number }[] }) => Promise<Operation>;
   validateOperation: (o: Operation) => void;
   addWarehouse: (w: Partial<Warehouse>) => Promise<void>;
   updateWarehouse: (id: string, w: Partial<Warehouse>) => Promise<void>;
@@ -38,16 +40,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [locations, setLocations] = useState<Location[]>([]); // Still mock for now or fetch from warehouse
   
   // Keep these as mocks until backend is ready
-  const [operations, setOperations] = useState<Operation[]>(MOCK_OPERATIONS);
-  const [moves, setMoves] = useState<Move[]>(MOCK_MOVES);
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [moves, setMoves] = useState<Move[]>([]);
 
   // Fetch Data on Mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [fetchedProducts, fetchedWarehouses] = await Promise.all([
+        const [fetchedProducts, fetchedWarehouses, fetchedOperations, fetchedMoves] = await Promise.all([
           productService.getAll(),
-          warehouseService.getAll()
+          warehouseService.getAll(),
+          operationService.list(),
+          moveService.list()
         ]);
         
         // Map backend product to frontend product (if needed, but we aligned types mostly)
@@ -59,6 +63,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setProducts(processedProducts);
         setWarehouses(fetchedWarehouses);
+        setOperations(fetchedOperations);
+        setMoves(fetchedMoves);
         
         // Flatten locations from warehouses
         const allLocations = fetchedWarehouses.flatMap(w => w.locations || []);
@@ -188,8 +194,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Operations are still client-side for now
-  const addOperation = (o: Operation) => setOperations(prev => [o, ...prev]);
-  const updateOperation = (o: Operation) => setOperations(prev => prev.map(op => op.id === o.id ? o : op));
+  const addOperation = async (type: 'Receipt' | 'Delivery', scheduleDate: string, locationId: string, contact?: string, items: { productId: string; quantity: number }[] = []) => {
+    try {
+      const created = await operationService.create({ type, scheduleDate, locationId, contact, items });
+      setOperations(prev => [created, ...prev]);
+      return created;
+    } catch (e) {
+      showToast('Failed to create operation', 'error');
+      throw e;
+    }
+  };
+
+  const updateOperation = async (id: string, payload: { contact?: string; items?: { productId: string; quantity: number }[] }) => {
+    try {
+      const updated = await operationService.updateDraft(id, payload);
+      setOperations(prev => prev.map(op => op.id === id ? updated : op));
+      return updated;
+    } catch (e) {
+      showToast('Failed to update operation', 'error');
+      throw e;
+    }
+  };
 
   const resetData = () => {
     // Re-fetch or clear? For now, just log
@@ -197,69 +222,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // The Core Logic: Processing an operation (Client-side simulation for now)
-  const validateOperation = useCallback((op: Operation) => {
+  const validateOperation = useCallback(async (op: Operation) => {
     if (op.status === 'Done') return;
-
-    // 1. Update Operation Status
-    const completedOp = { ...op, status: 'Done' as const };
-    setOperations(prev => prev.map(o => o.id === op.id ? completedOp : o));
-
-    // 2. Update Stocks & Create Moves
-    const newMoves: Move[] = [];
-    const productUpdates = new Map<string, number>();
-
-    op.items.forEach(item => {
-      let qtyChange = 0;
-      let moveType: 'in' | 'out' | 'internal' = 'internal';
-      
-      if (op.type === 'Receipt') {
-        qtyChange = item.done;
-        moveType = 'in';
-      } else if (op.type === 'Delivery') {
-        qtyChange = -item.done;
-        moveType = 'out';
-      } else if (op.type === 'Adjustment') {
-        qtyChange = item.done;
-        moveType = item.done >= 0 ? 'in' : 'out';
-      } else if (op.type === 'Internal') {
-        qtyChange = 0; 
-        moveType = 'internal';
-      }
-
-      productUpdates.set(item.productId, qtyChange);
-
-      const product = products.find(p => p.id === item.productId);
-      if (product) {
-        newMoves.push({
-          id: Date.now().toString() + Math.random().toString(),
-          reference: op.reference,
-          date: new Date().toLocaleString(),
-          product: `[${product.sku}] ${product.name}`,
-          from: op.source,
-          to: op.destination,
-          quantity: Math.abs(item.done),
-          status: 'Done',
-          contact: op.contact,
-          type: moveType
-        });
-      }
-    });
-
-    // Apply Stock Updates (Optimistic UI update - ideally should call backend)
-    setProducts(prev => prev.map(p => {
-      const change = productUpdates.get(p.id);
-      if (change !== undefined && change !== 0) {
-        const newStock = Math.max(0, p.quantity + change);
-        const newStatus = newStock === 0 ? 'Out of Stock' : newStock <= p.minThreshold ? 'Low Stock' : 'In Stock';
-        // Note: We are not persisting this to backend yet!
-        return { ...p, quantity: newStock, status: newStatus as any };
-      }
-      return p;
-    }));
-
-    setMoves(prev => [...newMoves, ...prev]);
-
-  }, [products]);
+    try {
+      const updated = await operationService.updateStatus(op.id, 'DONE');
+      setOperations(prev => prev.map(o => o.id === op.id ? updated : o));
+      // Refresh products and moves after backend applied changes
+      const [freshProducts, freshMoves] = await Promise.all([
+        productService.getAll(),
+        moveService.list()
+      ]);
+      const processedProducts = freshProducts.map(p => ({
+        ...p,
+        status: (p.quantity === 0 ? 'Out of Stock' : p.quantity <= p.minThreshold ? 'Low Stock' : 'In Stock') as any
+      }));
+      setProducts(processedProducts);
+      setMoves(freshMoves);
+    } catch (e) {
+      showToast('Failed to validate operation', 'error');
+    }
+  }, [showToast]);
 
   // Simulation Logic for Nexus
   const simulateScenario = (type: 'crash' | 'viral' | 'hack') => {
