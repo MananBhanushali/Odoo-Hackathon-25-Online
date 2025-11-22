@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, Plus, Filter, MapPin, Box, ScanBarcode, ArrowUpDown, X, PackagePlus, Pencil, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, Plus, MapPin, Box, X, PackagePlus, Pencil, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
 import { Product, Operation } from '../types';
 import Card from '../components/ui/Card';
 import { ShimmerButton } from '../components/ui/ShimmerButton';
@@ -14,6 +14,8 @@ const Products: React.FC = () => {
   const [search, setSearch] = useState('');
   const { showToast } = useToast();
   const [activeCategory, setActiveCategory] = useState('All');
+    const [filterWarehouseId, setFilterWarehouseId] = useState<string>('');
+    const [filterLocationId, setFilterLocationId] = useState<string>('');
   
   // Product Form State (Unified for Add & Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -32,11 +34,25 @@ const Products: React.FC = () => {
   const [restockProduct, setRestockProduct] = useState<Product | null>(null);
   const [restockQty, setRestockQty] = useState(1);
 
-  const filteredProducts = products.filter(p => 
-    (activeCategory === 'All' || p.category === activeCategory) &&
-    (p.name.toLowerCase().includes(search.toLowerCase()) || 
-    p.sku.toLowerCase().includes(search.toLowerCase()))
-  );
+    const filteredProducts = products.filter(p => {
+        const matchesCategory = (activeCategory === 'All' || p.category === activeCategory);
+        const matchesSearch = (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()));
+        // Warehouse filtering: find location of product and check its warehouseId
+        let matchesWarehouse = true;
+        if (filterWarehouseId) {
+            if (p.locationId) {
+                const loc = locations.find(l => l.id === p.locationId);
+                matchesWarehouse = loc ? loc.warehouseId === filterWarehouseId : false;
+            } else {
+                matchesWarehouse = false;
+            }
+        }
+        let matchesLocation = true;
+        if (filterLocationId) {
+            matchesLocation = p.locationId === filterLocationId;
+        }
+        return matchesCategory && matchesSearch && matchesWarehouse && matchesLocation;
+    });
 
   const categories = ['All', 'Raw Material', 'Furniture', 'Electronics', 'Chemicals', 'Tools', 'Packaging'];
 
@@ -143,12 +159,8 @@ const Products: React.FC = () => {
           <h2 className="text-4xl font-bold text-slate-900 dark:text-white tracking-tight">Inventory</h2>
           <p className="text-slate-500 dark:text-gray-400 mt-1">Manage your products, prices, and stock levels.</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-             <button className="px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-white/10 transition-colors flex items-center gap-2 font-medium">
-                <ScanBarcode size={20} />
-                <span className="hidden sm:inline">Scan Item</span>
-             </button>
-             <ShimmerButton 
+          <div className="flex flex-wrap gap-3">
+                 <ShimmerButton 
                 onClick={handleOpenAdd}
                 className="shadow-lg shadow-blue-500/20"
                 background="linear-gradient(to right, #2563EB, #06B6D4)"
@@ -182,16 +194,6 @@ const Products: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                 <div className="hidden md:flex items-center gap-2 mr-2">
-                    <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                        <Filter size={16} />
-                        Filter
-                    </button>
-                    <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                        <ArrowUpDown size={16} />
-                        Sort
-                    </button>
-                 </div>
                  <div className="bg-white dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10 flex items-center">
                     <button 
                         onClick={() => setView('grid')}
@@ -233,6 +235,51 @@ const Products: React.FC = () => {
               ))}
           </div>
       </div>
+
+            {/* Warehouse / Location Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1">Warehouse Filter</label>
+                    <select
+                        value={filterWarehouseId}
+                        onChange={e => {
+                            setFilterWarehouseId(e.target.value);
+                            setFilterLocationId(''); // reset dependent location
+                        }}
+                        className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    >
+                        <option value="">All Warehouses</option>
+                        {warehouses.map(w => (
+                            <option key={w.id} value={w.id}>{w.name} ({w.shortCode})</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1">Location Filter</label>
+                    <select
+                        value={filterLocationId}
+                        onChange={e => setFilterLocationId(e.target.value)}
+                        disabled={!filterWarehouseId}
+                        className="w-full bg-white dark:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    >
+                        <option value="">{filterWarehouseId ? 'All Locations' : 'Select warehouse first'}</option>
+                        {locations.filter(l => !filterWarehouseId || l.warehouseId === filterWarehouseId).map(l => (
+                            <option key={l.id} value={l.id}>{l.name} ({l.shortCode})</option>
+                        ))}
+                    </select>
+                    {filterWarehouseId && locations.filter(l => l.warehouseId === filterWarehouseId).length === 0 && (
+                        <p className="text-[10px] text-red-500 mt-1">No locations for selected warehouse.</p>
+                    )}
+                </div>
+                <div className="flex items-end">
+                    <button
+                        onClick={() => { setFilterWarehouseId(''); setFilterLocationId(''); }}
+                        className="w-full px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-white rounded-xl text-sm font-medium border border-slate-200 dark:border-white/10 transition-colors"
+                    >
+                        Reset Filters
+                    </button>
+                </div>
+            </div>
 
       {/* Content Grid/List */}
       <div className={`grid ${view === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'} gap-6`}>
